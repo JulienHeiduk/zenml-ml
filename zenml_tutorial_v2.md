@@ -1,4 +1,3 @@
-```markdown
 # How to Use ZenML for Building a Machine Learning Pipeline
 
 In this tutorial, we will explore how to use ZenML to build a machine learning pipeline that performs data loading, model training, and evaluation. We will use the popular Iris dataset and a RandomForestClassifier for our machine learning task. Let's get started!
@@ -161,6 +160,3 @@ python pipelines/training_pipeline.py
 ### Conclusion
 
 Congratulations! You have successfully set up and run a basic machine learning pipeline using ZenML. This tutorial demonstrated how to define a pipeline, load data, train a model, and evaluate its performance. You can extend this pipeline by adding more steps, integrating different models, or experimenting with other datasets. Happy coding!
-```
-
-This update includes a new section introducing pipelines and steps in ZenML, providing essential context for understanding how the framework operates within the tutorial's framework.
