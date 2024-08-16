@@ -1,100 +1,32 @@
-# How to Use ZenML for Building a Machine Learning Pipeline
+# How to Integrate MLflow into a ZenML Pipeline
 
-In this tutorial, we will explore how to use ZenML to build a machine learning pipeline that performs data loading, model training, and evaluation. We will use the popular Iris dataset and a RandomForestClassifier for our machine learning task. Let's get started!
+In this tutorial, we'll focus on adding MLflow to a ZenML pipeline for easy tracking and monitoring of your machine learning experiments. MLflow is a powerful tool that provides functionalities for logging parameters, metrics, and models, making it easier to manage the lifecycle of machine learning projects.
 
 ## Prerequisites
 
-Before we dive into the code, ensure that you have the following installed:
+Before we get started, ensure that you have the following tools and libraries installed:
 
-- Python 3.8 or later
-- ZenML: Install it via pip
-  ```bash
-  pip install zenml
-  ```
-- Other necessary libraries: Scikit-learn and NumPy
-  ```bash
-  pip install scikit-learn numpy
-  ```
+- [ZenML](https://zenml.io/)
+- [MLflow](https://mlflow.org/)
+- [scikit-learn](https://scikit-learn.org/)
+- A coding environment with Python
 
-## Project Structure
+## Setting Up Your ZenML Pipeline
 
-Make sure your project has the following structure:
+Let's define a pipeline that includes the training and evaluation of a model using the `RandomForestClassifier`, while also tracking relevant metrics and parameters using MLflow. Below, we'll detail the pipeline definition with the included MLflow integration.
 
-```
-/your_project
-  ├── /pipelines
-  │    └── training_pipeline.py
-  └── /steps
-       ├── load_data_step.py
-       ├── train_model_step.py
-       └── evaluate_model_step.py
-```
+### 1. Pipeline Definition (`pipelines/training_pipeline.py`)
 
-### Step 1: Define the Pipeline
+We'll create two steps in our pipeline: `train_model` for training the model, and `evaluate_model` for evaluating the model's performance.
 
-In the `pipelines/training_pipeline.py` file, we will define our ZenML pipeline. This pipeline will include steps for loading data, training the model, and evaluating it.
-
-```python
-import sys
-import os
-from zenml import pipeline
-
-# Add the parent directory to the module search path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from steps.load_data_step import load_data
-from steps.train_model_step import train_model
-from steps.evaluate_model_step import evaluate_model
-
-@pipeline(name="Tutorial", enable_cache=False)
-def training_pipeline():
-    X_train, X_test, y_train, y_test = load_data()
-    model = train_model(X_train, y_train)
-    evaluate_model(model, X_test, y_test)
-
-if __name__ == "__main__":
-    training_pipeline()
-```
-
-### Step 2: Create the Data Loading Step
-
-Next, create the `load_data_step.py` file in the `steps` directory. This step will load the Iris dataset and split it into training and testing datasets.
-
-```python
-from zenml import step
-from typing import Tuple
-from sklearn.datasets import load_iris
-from sklearn.model_selection import train_test_split
-import numpy as np
-import logging
-from typing import Annotated
-
-@step
-def load_data() -> Tuple[
-    Annotated[np.ndarray, "X_train"],
-    Annotated[np.ndarray, "X_test"],
-    Annotated[np.ndarray, "y_train"],
-    Annotated[np.ndarray, "y_test"],
-]:
-    """Load the Iris dataset and split it into training and testing data."""
-    logging.info("Loading iris dataset...")
-    data = load_iris()
-    logging.info("Splitting train and test data...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        data.data, data.target, test_size=0.2, random_state=42
-    )
-    return X_train, X_test, y_train, y_test
-```
-
-### Step 3: Create the Model Training Step
-
-Now, we define the model training step in `train_model_step.py`. This step will train a RandomForestClassifier on the training dataset.
+#### Code for Training Step
 
 ```python
 from zenml import step
 from sklearn.ensemble import RandomForestClassifier
 from typing import Annotated
 import numpy as np
+import mlflow
 
 @step(enable_cache=False)
 def train_model(
@@ -103,13 +35,19 @@ def train_model(
 ) -> RandomForestClassifier:
     """Train a RandomForest model on the training data."""
     model = RandomForestClassifier()
-    model.fit(X_train, y_train)
+    with mlflow.start_run():
+        model.fit(X_train, y_train)
+        mlflow.log_param("n_estimators", model.n_estimators)
+        mlflow.log_param("max_depth", model.max_depth)
     return model
 ```
 
-### Step 4: Create the Model Evaluation Step
+In this step:
+- We define the `train_model` function, which takes `X_train` and `y_train` as inputs.
+- A `RandomForestClassifier` is instantiated and fitted to the training data.
+- MLflow's `start_run()` context is used to log the parameters `n_estimators` and `max_depth` of the model once it is trained.
 
-Finally, we will create the model evaluation step in `evaluate_model_step.py`. This step will evaluate the trained model on the test dataset and print the accuracy.
+#### Code for Evaluation Step
 
 ```python
 from zenml import step
@@ -118,6 +56,7 @@ import logging
 from typing import Annotated
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
+import mlflow
 
 @step(enable_cache=False)
 def evaluate_model(
@@ -129,18 +68,24 @@ def evaluate_model(
     logging.info("Evaluating the model...")
     predictions = model.predict(X_test)
     accuracy = accuracy_score(y_test, predictions)
+    with mlflow.start_run():
+        mlflow.log_metric("accuracy", accuracy)
     logging.info(f"Model accuracy: {accuracy}")
     print(f"Accuracy: {accuracy}")
 ```
 
-### Step 5: Run the Pipeline
+In the evaluation step:
+- We define the `evaluate_model` function that accepts the trained model and test data.
+- After logging the start of the evaluation, the model's predictions are generated, and the accuracy is computed using `accuracy_score`.
+- The obtained accuracy is logged to MLflow within a new run context.
 
-Now that everything is set up, you can run your pipeline. Open your terminal, navigate to your project directory, and execute the following command:
+### Summary
 
-```bash
-python pipelines/training_pipeline.py
-```
+You have successfully integrated MLflow into your ZenML pipeline. This setup allows you to track important parameters and metrics throughout your machine learning workflow. As you experiment with different model configurations, the logs can help you compare and choose the best-performing models.
 
-### Conclusion
+### Next Steps
 
-Congratulations! You have successfully set up and run a basic machine learning pipeline using ZenML. This tutorial demonstrated how to define a pipeline, load data, train a model, and evaluate its performance. You can extend this pipeline by adding more steps, integrating different models, or experimenting with other datasets. Happy coding!
+1. **Run Your Pipeline**: Create a ZenML pipeline that utilizes the defined steps and executes the training and evaluation.
+2. **Explore MLflow UI**: Use the MLflow tracking UI to visualize the logged parameters and metrics.
+
+Feel free to modify the pipeline steps as per your requirements and explore more functionality that MLflow offers for enhancing your machine learning projects. Happy experimenting with ZenML and MLflow!

@@ -4,6 +4,7 @@ import logging
 from typing import Annotated
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
+import mlflow
 
 @step(enable_cache=False)
 def evaluate_model(
@@ -15,5 +16,7 @@ def evaluate_model(
     logging.info("Evaluating the model...")
     predictions = model.predict(X_test)
     accuracy = accuracy_score(y_test, predictions)
+    with mlflow.start_run():
+        mlflow.log_metric("accuracy", accuracy)
     logging.info(f"Model accuracy: {accuracy}")
     print(f"Accuracy: {accuracy}")
