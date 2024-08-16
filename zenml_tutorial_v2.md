@@ -1,5 +1,3 @@
-Here's the revised Markdown file with the new section discussing the concepts of pipelines and steps in ZenML:
-
 ```markdown
 # How to Use ZenML for Building a Machine Learning Pipeline
 
