@@ -1,25 +1,32 @@
-# How to Integrate MLflow into a ZenML Pipeline
+# Adding MLflow to a ZenML Pipeline Tutorial
 
-In this tutorial, we'll focus on adding MLflow to a ZenML pipeline for easy tracking and monitoring of your machine learning experiments. MLflow is a powerful tool that provides functionalities for logging parameters, metrics, and models, making it easier to manage the lifecycle of machine learning projects.
+In this tutorial, we will integrate MLflow into a ZenML pipeline for tracking machine learning experiments. MLflow is an open-source platform to manage the ML lifecycle, including experimentation, reproducibility, and deployment.
+
+We will enhance a simple training pipeline that uses a RandomForestClassifier from Scikit-learn. You can find the detailed explanation of each part of the code in my previous article [here](https://jheiduk.com/posts/zenml_tutorial/). 
 
 ## Prerequisites
 
-Before we get started, ensure that you have the following tools and libraries installed:
+Before we begin, make sure you have the following installed:
 
-- [ZenML](https://zenml.io/)
-- [MLflow](https://mlflow.org/)
-- [scikit-learn](https://scikit-learn.org/)
-- A coding environment with Python
+- Python (3.7 or above)
+- ZenML
+- MLflow
+- Scikit-learn
+- Numpy
 
-## Setting Up Your ZenML Pipeline
+You can install the required packages using pip:
 
-Let's define a pipeline that includes the training and evaluation of a model using the `RandomForestClassifier`, while also tracking relevant metrics and parameters using MLflow. Below, we'll detail the pipeline definition with the included MLflow integration.
+```bash
+pip install zenml mlflow scikit-learn numpy
+```
 
-### 1. Pipeline Definition (`pipelines/training_pipeline.py`)
+## Step 1: Define Your Pipeline
 
-We'll create two steps in our pipeline: `train_model` for training the model, and `evaluate_model` for evaluating the model's performance.
+We'll create the training pipeline in `pipelines/training_pipeline.py`. Below are the code snippets for the training and evaluation steps where we incorporate MLflow.
 
-#### Code for Training Step
+### Training the Model
+
+First, we will create a function to train our model and log relevant parameters using MLflow.
 
 ```python
 from zenml import step
@@ -33,21 +40,27 @@ def train_model(
     X_train: Annotated[np.ndarray, "X_train"],
     y_train: Annotated[np.ndarray, "y_train"]
 ) -> RandomForestClassifier:
-    """Train a RandomForest model on the training data."""
+    """Train a RandomForest model on training data."""
     model = RandomForestClassifier()
+
     with mlflow.start_run():
         model.fit(X_train, y_train)
         mlflow.log_param("n_estimators", model.n_estimators)
         mlflow.log_param("max_depth", model.max_depth)
+    
     return model
 ```
 
-In this step:
-- We define the `train_model` function, which takes `X_train` and `y_train` as inputs.
-- A `RandomForestClassifier` is instantiated and fitted to the training data.
-- MLflow's `start_run()` context is used to log the parameters `n_estimators` and `max_depth` of the model once it is trained.
+In this code:
 
-#### Code for Evaluation Step
+- We define a ZenML step named `train_model`.
+- We instantiate a `RandomForestClassifier`.
+- We start an MLflow run using `with mlflow.start_run()`, which encapsulates the training context.
+- We log model parameters such as `n_estimators` and `max_depth` using `mlflow.log_param()`.
+
+### Evaluating the Model
+
+Next, we will create a function to evaluate the trained model and log its accuracy.
 
 ```python
 from zenml import step
@@ -64,28 +77,39 @@ def evaluate_model(
     X_test: Annotated[np.ndarray, "X_test"],
     y_test: Annotated[np.ndarray, "y_test"]
 ) -> None:
-    """Evaluate the trained model on the test data."""
+    """Evaluate the trained model on test data."""
     logging.info("Evaluating the model...")
     predictions = model.predict(X_test)
     accuracy = accuracy_score(y_test, predictions)
+    
     with mlflow.start_run():
         mlflow.log_metric("accuracy", accuracy)
+    
     logging.info(f"Model accuracy: {accuracy}")
     print(f"Accuracy: {accuracy}")
 ```
 
-In the evaluation step:
-- We define the `evaluate_model` function that accepts the trained model and test data.
-- After logging the start of the evaluation, the model's predictions are generated, and the accuracy is computed using `accuracy_score`.
-- The obtained accuracy is logged to MLflow within a new run context.
+In this evaluation step:
 
-### Summary
+- We retrieve predictions from the model and compute the accuracy.
+- We start another MLflow run to log the accuracy metric with `mlflow.log_metric()`.
 
-You have successfully integrated MLflow into your ZenML pipeline. This setup allows you to track important parameters and metrics throughout your machine learning workflow. As you experiment with different model configurations, the logs can help you compare and choose the best-performing models.
+## Step 2: Run Your Pipeline
 
-### Next Steps
+Once you've defined your pipeline, you can run it through ZenML. Ensure that you have set up ZenML correctly, and then execute:
 
-1. **Run Your Pipeline**: Create a ZenML pipeline that utilizes the defined steps and executes the training and evaluation.
-2. **Explore MLflow UI**: Use the MLflow tracking UI to visualize the logged parameters and metrics.
+```bash
+zenml pipeline run
+```
 
-Feel free to modify the pipeline steps as per your requirements and explore more functionality that MLflow offers for enhancing your machine learning projects. Happy experimenting with ZenML and MLflow!
+This will train and evaluate your model while logging all relevant metrics and parameters in MLflow.
+
+## Conclusion
+
+By adding MLflow to your ZenML pipeline, you can effectively track your machine learning experiments, making it easier to monitor, analyze, and reproduce your work. The integration shown in this tutorial allows you to log important parameters and metrics in a structured way.
+
+For further reading on ZenML and MLflow, you can check their respective documentation:
+- [ZenML Documentation](https://docs.zenml.io/)
+- [MLflow Documentation](https://www.mlflow.org/docs/latest/index.html)
+
+Happy experimenting!

@@ -1,46 +1,141 @@
-## Running MLflow and Accessing the UI
+```markdown
+# Adding MLflow to a ZenML Pipeline
 
-### How to Run MLflow
+In this tutorial, we will integrate MLflow into a ZenML pipeline for tracking machine learning experiments. MLflow is an open-source platform to manage the ML lifecycle, including experimentation, reproducibility, and deployment.
 
-To start tracking your machine learning experiments with MLflow, follow these steps:
+We will enhance a simple training pipeline that uses a RandomForestClassifier from Scikit-learn. You can find the detailed explanation of each part of the code in my previous article [here](https://jheiduk.com/posts/zenml_tutorial/). 
 
-1. **Install MLflow**: If you haven’t done so already, you can install MLflow using pip:
-   ```bash
-   pip install mlflow
-   ```
+## Prerequisites
 
-2. **Set Up Tracking Server**: Optionally, you can set up a centralized tracking server for larger teams:
-   ```bash
-   mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./artifacts
-   ```
-   This command starts an MLflow server that can store tracking data and artifacts.
+Before we begin, make sure you have the following installed:
 
-3. **Start MLflow UI**: To visualize your logged experiments, you can start the MLflow tracking UI by running:
-   ```bash
-   mlflow ui
-   ```
-   By default, the UI will be accessible at `http://localhost:5000`.
+- Python (3.7 or above)
+- ZenML
+- MLflow
+- Scikit-learn
+- Numpy
 
-### Accessing the MLflow UI
+You can install the required packages using pip:
 
-Once the MLflow UI is running, you can access it via your web browser at `http://localhost:5000`. The interface allows you to:
+```bash
+pip install zenml mlflow scikit-learn numpy
+```
 
-- View all runs and their parameters, metrics, and artifacts.
-- Compare different runs visually, helping you identify which hyperparameter settings yield the best performance.
-- Search for specific runs using filters.
+## Step 1: Define Your Pipeline
+
+We'll create the training pipeline in `pipelines/training_pipeline.py`. Below are the code snippets for the training and evaluation steps where we incorporate MLflow.
+
+### Training the Model
+
+First, we will create a function to train our model and log relevant parameters using MLflow.
+
+```python
+from zenml import step
+from sklearn.ensemble import RandomForestClassifier
+from typing import Annotated
+import numpy as np
+import mlflow
+
+@step(enable_cache=False)
+def train_model(
+    X_train: Annotated[np.ndarray, "X_train"],
+    y_train: Annotated[np.ndarray, "y_train"]
+) -> RandomForestClassifier:
+    """Train a RandomForest model on training data."""
+    model = RandomForestClassifier()
+
+    with mlflow.start_run():
+        model.fit(X_train, y_train)
+        mlflow.log_param("n_estimators", model.n_estimators)
+        mlflow.log_param("max_depth", model.max_depth)
+    
+    return model
+```
+
+In this code:
+
+- We define a ZenML step named `train_model`.
+- We instantiate a `RandomForestClassifier`.
+- We start an MLflow run using `with mlflow.start_run()`, which encapsulates the training context.
+- We log model parameters such as `n_estimators` and `max_depth` using `mlflow.log_param()`.
+
+### Evaluating the Model
+
+Next, we will create a function to evaluate the trained model and log its accuracy.
+
+```python
+from zenml import step
+from sklearn.metrics import accuracy_score
+import logging
+from typing import Annotated
+from sklearn.ensemble import RandomForestClassifier
+import numpy as np
+import mlflow
+
+@step(enable_cache=False)
+def evaluate_model(
+    model: RandomForestClassifier,
+    X_test: Annotated[np.ndarray, "X_test"],
+    y_test: Annotated[np.ndarray, "y_test"]
+) -> None:
+    """Evaluate the trained model on test data."""
+    logging.info("Evaluating the model...")
+    predictions = model.predict(X_test)
+    accuracy = accuracy_score(y_test, predictions)
+    
+    with mlflow.start_run():
+        mlflow.log_metric("accuracy", accuracy)
+    
+    logging.info(f"Model accuracy: {accuracy}")
+    print(f"Accuracy: {accuracy}")
+```
+
+In this evaluation step:
+
+- We retrieve predictions from the model and compute the accuracy.
+- We start another MLflow run to log the accuracy metric with `mlflow.log_metric()`.
+
+## Step 2: Run Your Pipeline
+
+Once you've defined your pipeline, you can run it through ZenML. Ensure that you have set up ZenML correctly, and then execute:
+
+```bash
+zenml pipeline run
+```
+
+This will train and evaluate your model while logging all relevant metrics and parameters in MLflow.
+
+## Step 3: Running MLflow
+
+To run MLflow, you need to start the MLflow server, which allows you to log, track, and visualize your experiments. You can do this by executing the following command in a terminal:
+
+```bash
+mlflow ui
+```
+
+By default, this will start the MLflow UI at `http://127.0.0.1:5000`. You can navigate to this URL in your web browser to access the dashboard where you can view your logged experiments, parameters, metrics, and models.
 
 ### Why Use MLflow in Your Pipeline
 
-Integrating MLflow into your ZenML pipeline offers several advantages:
+Integrating MLflow into your machine learning pipeline provides several advantages:
 
-1. **Experiment Tracking**: MLflow provides a structured way to log all experiment metadata, including parameters, metrics, and model artifacts, helping you keep track of your experiments systematically.
+1. **Experiment Tracking**: Easily log and organize your experiments, allowing you to track what parameters and configurations yield the best results.
+   
+2. **Model Versioning**: Keep a history of model versions in a structured manner, making it easier to revert or compare previous iterations.
 
-2. **Reproducibility**: By logging every run, MLflow ensures that your model iterations can be reproduced easily. You can revisit any specific run later to analyze decisions made during the modeling process.
+3. **Visualization**: The user-friendly MLflow UI offers visualizations for metrics across different runs, helping you analyze model performance effectively.
 
-3. **Model Registry**: MLflow offers a model registry, facilitating collaboration among team members. You can promote models to different stages (e.g., staging, production), making it easier to manage the model lifecycle.
+4. **Reproducibility**: Logging all the configurations and metrics ensures that you can reproduce the training process later, which is essential in a collaborative data science environment.
 
-4. **Visualization and Comparison**: The UI allows for intuitive visualization of your metrics and parameters, making it much simpler to compare different models and configurations.
+5. **Integration**: MLflow integrates seamlessly with many existing tools and libraries, enhancing your workflow without significant changes to your existing codebase.
 
-5. **Integration with Multiple ML Libraries**: Even if your pipeline evolves over time, MLflow’s support for various libraries means you can continue to use it without being locked into a specific framework.
+## Conclusion
 
-Integrating MLflow into your machine learning pipeline can significantly enhance your workflow, leading to better experiment tracking, documentation, and ultimately, improved model performance. 
+By adding MLflow to your ZenML pipeline, you can effectively track your machine learning experiments, making it easier to monitor, analyze, and reproduce your work. The integration shown in this tutorial allows you to log important parameters and metrics in a structured way.
+
+For further reading on ZenML and MLflow, you can check their respective documentation:
+- [ZenML Documentation](https://docs.zenml.io/)
+- [MLflow Documentation](https://www.mlflow.org/docs/latest/index.html)
+
+Happy experimenting!
+```
