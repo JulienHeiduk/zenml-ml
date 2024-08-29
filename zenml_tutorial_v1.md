@@ -1,115 +1,93 @@
-# Adding MLflow to a ZenML Pipeline Tutorial
+# ZenML Pipeline Tutorial: Understanding Artefacts and Adding Inference Steps
 
-In this tutorial, we will integrate MLflow into a ZenML pipeline for tracking machine learning experiments. MLflow is an open-source platform to manage the ML lifecycle, including experimentation, reproducibility, and deployment.
+In this tutorial, we will dive deep into the concept of artefacts in ZenML pipelines. We’ll explain how to define and use them, with a focus on the newly added inference step in an existing pipeline. 
 
-We will enhance a simple training pipeline that uses a RandomForestClassifier from Scikit-learn. You can find the detailed explanation of each part of the code in my previous article [here](https://jheiduk.com/posts/zenml_tutorial/). 
+## What is an Artefact in ZenML?
 
-## Prerequisites
+In ZenML, artefacts represent the output of processing steps within a pipeline. These outputs can be various formats such as datasets, models, metrics, or predictions. Artefacts allow you to track these outputs and reuse them across different workflows. By managing artefacts effectively, you can facilitate reproducibility, versioning, and deployment of your machine learning models.
 
-Before we begin, make sure you have the following installed:
+## Adding an Inference Step to the Pipeline
 
-- Python (3.7 or above)
-- ZenML
-- MLflow
-- Scikit-learn
-- Numpy
+We recently updated our pipeline to include an inference step, where the trained model is used to make predictions on the test dataset. Below is the updated definition of our training pipeline, along with the inference step:
 
-You can install the required packages using pip:
+### 1. Pipeline Definition (`pipelines/training_pipeline.py`)
 
-```bash
-pip install zenml mlflow scikit-learn numpy
-```
-
-## Step 1: Define Your Pipeline
-
-We'll create the training pipeline in `pipelines/training_pipeline.py`. Below are the code snippets for the training and evaluation steps where we incorporate MLflow.
-
-### Training the Model
-
-First, we will create a function to train our model and log relevant parameters using MLflow.
+This code defines our updated pipeline, where we integrate the inference step.
 
 ```python
-from zenml import step
-from sklearn.ensemble import RandomForestClassifier
-from typing import Annotated
-import numpy as np
-import mlflow
+import sys
+import os
+from zenml import pipeline
 
-@step(enable_cache=False)
-def train_model(
-    X_train: Annotated[np.ndarray, "X_train"],
-    y_train: Annotated[np.ndarray, "y_train"]
-) -> RandomForestClassifier:
-    """Train a RandomForest model on training data."""
-    model = RandomForestClassifier()
+# Adding the parent directory to the module search path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-    with mlflow.start_run():
-        model.fit(X_train, y_train)
-        mlflow.log_param("n_estimators", model.n_estimators)
-        mlflow.log_param("max_depth", model.max_depth)
+from steps.load_data_step import load_data
+from steps.train_model_step import train_model
+from steps.evaluate_model_step import evaluate_model
+from steps.inference_step import inference_step
+
+@pipeline(name="Tutorial", enable_cache=False)
+def training_pipeline():
+    # Load data
+    X_train, X_test, y_train, y_test = load_data()
     
-    return model
+    # Train the model
+    model = train_model(X_train, y_train)
+    
+    # Evaluate the model
+    evaluate_model(model, X_test, y_test)
+    
+    # Inference
+    predictions = inference_step(model, X_test)
+
+if __name__ == "__main__":
+    training_pipeline()
 ```
 
-In this code:
+### 2. Inference Step (`steps/inference_step.py`)
 
-- We define a ZenML step named `train_model`.
-- We instantiate a `RandomForestClassifier`.
-- We start an MLflow run using `with mlflow.start_run()`, which encapsulates the training context.
-- We log model parameters such as `n_estimators` and `max_depth` using `mlflow.log_param()`.
-
-### Evaluating the Model
-
-Next, we will create a function to evaluate the trained model and log its accuracy.
+This code snippet shows how we define the inference step, which takes the trained model and makes predictions on the test dataset.
 
 ```python
 from zenml import step
-from sklearn.metrics import accuracy_score
-import logging
-from typing import Annotated
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
-import mlflow
 
 @step(enable_cache=False)
-def evaluate_model(
-    model: RandomForestClassifier,
-    X_test: Annotated[np.ndarray, "X_test"],
-    y_test: Annotated[np.ndarray, "y_test"]
-) -> None:
-    """Evaluate the trained model on test data."""
-    logging.info("Evaluating the model...")
+def inference_step(model: RandomForestClassifier, X_test: np.ndarray) -> np.ndarray:
+    """Inference on test dataset."""
     predictions = model.predict(X_test)
-    accuracy = accuracy_score(y_test, predictions)
-    
-    with mlflow.start_run():
-        mlflow.log_metric("accuracy", accuracy)
-    
-    logging.info(f"Model accuracy: {accuracy}")
-    print(f"Accuracy: {accuracy}")
+    return predictions
 ```
 
-In this evaluation step:
+## Loading Artefacts
 
-- We retrieve predictions from the model and compute the accuracy.
-- We start another MLflow run to log the accuracy metric with `mlflow.log_metric()`.
+Once the inference step has been executed, it generates artefacts (i.e., the predictions). To work with these artefacts later on, we can use the following script to load them.
 
-## Step 2: Run Your Pipeline
+### Load Artefact Script (`load_artefact.py`)
 
-Once you've defined your pipeline, you can run it through ZenML. Ensure that you have set up ZenML correctly, and then execute:
+This snippet demonstrates how to load a specific artefact from the ZenML client using its unique identifier.
 
-```bash
-zenml pipeline run
+```python
+from zenml.client import Client
+
+# Replace with your artefact UUID
+artifact = Client().get_artifact_version('4f12d004-1a1f-453f-9321-a4da200345d4')
+loaded_artifact = artifact.load()
+
+print(loaded_artifact)
 ```
 
-This will train and evaluate your model while logging all relevant metrics and parameters in MLflow.
+### Explanation:
+- **Client()**: This initializes the ZenML client that allows interaction with your ZenML environment.
+- **get_artifact_version()**: We retrieve a specific version of the artefact using its unique identifier.
+- **load()**: This method loads the artefact into memory, allowing you to work with it directly.
 
 ## Conclusion
 
-By adding MLflow to your ZenML pipeline, you can effectively track your machine learning experiments, making it easier to monitor, analyze, and reproduce your work. The integration shown in this tutorial allows you to log important parameters and metrics in a structured way.
+In this tutorial, we learned about the significance of artefacts in ZenML pipelines and how to integrate an inference step into an existing training pipeline. We also explained how to load these artefacts for further analysis or deployment. 
 
-For further reading on ZenML and MLflow, you can check their respective documentation:
-- [ZenML Documentation](https://docs.zenml.io/)
-- [MLflow Documentation](https://www.mlflow.org/docs/latest/index.html)
+To give more context on the previous steps in the pipeline, feel free to check out the article [here](https://jheiduk.com/posts/zenml_tutorial/). 
 
-Happy experimenting!
+With this knowledge, you should be well-equipped to utilize artefacts in your ZenML workflows effectively. Happy coding!
